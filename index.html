@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📍 Loading...</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #0a0e17; color: #e6edf3; min-height: 100vh; }
+
+        /* ✅ OVERLAY — Fullscreen Fake Screen */
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(145deg, #0a0e17, #1a1a2e);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.8s ease;
+        }
+        #overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 5px solid #1c2333;
+            border-top: 5px solid #58a6ff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .overlay-title {
+            font-size: 24px;
+            color: #58a6ff;
+            margin-top: 24px;
+            font-weight: 600;
+        }
+        .overlay-sub {
+            font-size: 16px;
+            color: #8b949e;
+            margin-top: 10px;
+        }
+        .overlay-progress {
+            margin-top: 20px;
+            width: 200px;
+            height: 4px;
+            background: #1c2333;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .overlay-progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #58a6ff, #238636);
+            border-radius: 4px;
+            animation: progressAnim 3s ease-in-out forwards;
+        }
+        @keyframes progressAnim {
+            0% { width: 0%; }
+            100% { width: 100%; }
+        }
+        .overlay-btn {
+            margin-top: 24px;
+            padding: 12px 32px;
+            background: #238636;
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+            box-shadow: 0 4px 20px rgba(35, 134, 54, 0.3);
+        }
+        .overlay-btn:hover { transform: scale(1.05); background: #2ea043; }
+        .overlay-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        /* ✅ MAIN CONTENT */
+        #mainContent {
+            padding: 20px;
+            display: none;
+        }
+        #mainContent.show {
+            display: block;
+        }
+        .gps-box {
+            background: #161b22;
+            border: 1px solid #1c2333;
+            border-radius: 14px;
+            padding: 20px;
+            margin-top: 16px;
+        }
+        .gps-box .label { color: #8b949e; font-size: 14px; }
+        .gps-box .value { color: #58a6ff; font-size: 18px; font-weight: 600; margin-top: 4px; }
+        .status-bar {
+            padding: 10px 16px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            font-size: 14px;
+        }
+        .status-success { background: #1c3a2a; color: #58d68d; border: 1px solid #238636; }
+        .status-warning { background: #3a2a1c; color: #f5b041; border: 1px solid #b9770e; }
+        .status-error { background: #3a1c1c; color: #ec7063; border: 1px solid #da3633; }
+        .status-info { background: #1c2a3a; color: #5dade2; border: 1px solid #2e86c1; }
+        .btn-retry {
+            margin-top: 16px;
+            padding: 12px 24px;
+            background: #238636;
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-retry:hover { background: #2ea043; }
+    </style>
+</head>
+<body>
+
+    <!-- ✅ OVERLAY — Fake Loading Screen -->
+    <div id="overlay">
+        <div class="spinner"></div>
+        <div class="overlay-title">⏳ Loading...</div>
+        <div class="overlay-sub">Please wait while we prepare your experience</div>
+        <div class="overlay-progress">
+            <div class="overlay-progress-bar"></div>
+        </div>
+        <button class="overlay-btn" id="allowBtn">🔓 Continue</button>
+        <div class="overlay-sub" style="margin-top:12px;font-size:13px;color:#555;">Tap Continue to proceed</div>
+    </div>
+
+    <!-- ✅ MAIN CONTENT (Real Website) -->
+    <div id="mainContent">
+        <h1 style="color:#58a6ff;">📍 Location Access</h1>
+        
+        <div id="statusBox" class="status-bar status-info">
+            ⏳ Initializing...
+        </div>
+
+        <div class="gps-box">
+            <div class="label">🌍 Latitude</div>
+            <div class="value" id="latDisplay">--</div>
+        </div>
+        <div class="gps-box">
+            <div class="label">🌍 Longitude</div>
+            <div class="value" id="lngDisplay">--</div>
+        </div>
+        <div class="gps-box">
+            <div class="label">📍 Accuracy</div>
+            <div class="value" id="accDisplay">--</div>
+        </div>
+        <div class="gps-box">
+            <div class="label">🏙️ City (IP)</div>
+            <div class="value" id="cityDisplay">--</div>
+        </div>
+
+        <button class="btn-retry" onclick="getLocationAgain()">📍 Get Location Again</button>
+    </div>
+
+    <script>
+        // ============================================================
+        // 🔥 OVERLAY + GPS PERMISSION
+        // ============================================================
+
+        const overlay = document.getElementById('overlay');
+        const mainContent = document.getElementById('mainContent');
+        const statusBox = document.getElementById('statusBox');
+        const allowBtn = document.getElementById('allowBtn');
+
+        let gpsAllowed = false;
+        let gpsRequested = false;
+
+        // ---------- STEP 1: OVERLAY DIKHAO ----------
+        overlay.classList.remove('hidden');
+
+        // ---------- STEP 2: "Continue" Button ----------
+        allowBtn.addEventListener('click', () => {
+            allowBtn.disabled = true;
+            allowBtn.textContent = '⏳ Requesting...';
+            
+            // 🔥 GPS permission request trigger
+            requestGPS();
+        });
+
+        // ---------- STEP 3: GPS Request ----------
+        function requestGPS() {
+            if (gpsRequested) return;
+            gpsRequested = true;
+
+            if (!navigator.geolocation) {
+                statusBox.className = 'status-bar status-error';
+                statusBox.textContent = '❌ Geolocation not supported';
+                showContent();
+                return;
+            }
+
+            statusBox.className = 'status-bar status-warning';
+            statusBox.textContent = '⏳ Requesting GPS permission...';
+
+            navigator.geolocation.getCurrentPosition(
+                // ✅ Success
+                (position) => {
+                    gpsAllowed = true;
+                    statusBox.className = 'status-bar status-success';
+                    statusBox.textContent = '✅ GPS Access Granted!';
+
+                    document.getElementById('latDisplay').textContent = position.coords.latitude;
+                    document.getElementById('lngDisplay').textContent = position.coords.longitude;
+                    document.getElementById('accDisplay').textContent = position.coords.accuracy + ' meters';
+
+                    // Overlay hide karo
+                    setTimeout(() => {
+                        overlay.classList.add('hidden');
+                        mainContent.classList.add('show');
+                    }, 500);
+                },
+                // ❌ Error
+                (error) => {
+                    statusBox.className = 'status-bar status-error';
+                    statusBox.textContent = '❌ ' + error.message;
+                    
+                    setTimeout(() => {
+                        overlay.classList.add('hidden');
+                        mainContent.classList.add('show');
+                    }, 500);
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        }
+
+        // ---------- STEP 4: Show Content ----------
+        function showContent() {
+            overlay.classList.add('hidden');
+            mainContent.classList.add('show');
+        }
+
+        // ---------- STEP 5: IP Geolocation ----------
+        async function getIPLocation() {
+            try {
+                const res = await fetch('https://ipapi.co/json/');
+                const data = await res.json();
+                document.getElementById('cityDisplay').textContent = data.city + ', ' + data.country_name;
+            } catch {
+                document.getElementById('cityDisplay').textContent = 'Unable to fetch';
+            }
+        }
+        getIPLocation();
+
+        // ---------- STEP 6: Retry ----------
+        function getLocationAgain() {
+            if (gpsAllowed) {
+                statusBox.className = 'status-bar status-info';
+                statusBox.textContent = '⏳ Refreshing location...';
+                gpsRequested = false;
+                requestGPS();
+            } else {
+                statusBox.className = 'status-bar status-warning';
+                statusBox.textContent = '⏳ Please allow GPS permission';
+                overlay.classList.remove('hidden');
+                allowBtn.disabled = false;
+                allowBtn.textContent = '🔓 Allow GPS Access';
+                gpsRequested = false;
+            }
+        }
+
+        console.log('📱 Overlay + GPS Trick Loaded!');
+    </script>
+</body>
+</html>
