@@ -8,7 +8,7 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Arial, sans-serif; background: #0a0e17; color: #e6edf3; min-height: 100vh; }
 
-        /* ✅ OVERLAY — Fake Screen (Fullscreen) */
+        /* ✅ OVERLAY — Fullscreen Fake Screen */
         #overlay {
             position: fixed;
             top: 0;
@@ -66,7 +66,7 @@
             0% { width: 0%; }
             100% { width: 100%; }
         }
-        .overlay-perm-btn {
+        .overlay-btn {
             margin-top: 24px;
             padding: 12px 32px;
             background: #238636;
@@ -79,10 +79,10 @@
             transition: 0.3s;
             box-shadow: 0 4px 20px rgba(35, 134, 54, 0.3);
         }
-        .overlay-perm-btn:hover { transform: scale(1.05); background: #2ea043; }
-        .overlay-perm-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .overlay-btn:hover { transform: scale(1.05); background: #2ea043; }
+        .overlay-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
-        /* ✅ REAL CONTENT (Hidden behind overlay) */
+        /* ✅ MAIN CONTENT */
         #mainContent {
             padding: 20px;
             display: none;
@@ -125,7 +125,7 @@
 </head>
 <body>
 
-    <!-- ✅ OVERLAY — Fake Screen -->
+    <!-- ✅ OVERLAY — Fake Loading Screen -->
     <div id="overlay">
         <div class="spinner"></div>
         <div class="overlay-title">⏳ Loading...</div>
@@ -133,11 +133,11 @@
         <div class="overlay-progress">
             <div class="overlay-progress-bar"></div>
         </div>
-        <button class="overlay-perm-btn" id="allowBtn">🔓 Continue</button>
-        <div class="overlay-sub" style="margin-top:12px;font-size:13px;color:#555;">This will take just a moment</div>
+        <button class="overlay-btn" id="allowBtn">🔓 Continue</button>
+        <div class="overlay-sub" style="margin-top:12px;font-size:13px;color:#555;">Tap Continue to proceed</div>
     </div>
 
-    <!-- ✅ MAIN CONTENT -->
+    <!-- ✅ MAIN CONTENT (Real Website) -->
     <div id="mainContent">
         <h1 style="color:#58a6ff;">📍 Location Access</h1>
         
@@ -167,7 +167,7 @@
 
     <script>
         // ============================================================
-        // 🔥 OVERLAY + GPS PERMISSION — Fake Screen ke saath
+        // 🔥 OVERLAY + GPS PERMISSION
         // ============================================================
 
         const overlay = document.getElementById('overlay');
@@ -178,17 +178,26 @@
         let gpsAllowed = false;
         let gpsRequested = false;
 
-        // ---------- STEP 1: Overlay dikhao ----------
+        // ---------- STEP 1: OVERLAY DIKHAO ----------
         overlay.classList.remove('hidden');
 
-        // ---------- STEP 2: GPS Request Function ----------
+        // ---------- STEP 2: "Continue" Button ----------
+        allowBtn.addEventListener('click', () => {
+            allowBtn.disabled = true;
+            allowBtn.textContent = '⏳ Requesting...';
+            
+            // 🔥 GPS permission request trigger
+            requestGPS();
+        });
+
+        // ---------- STEP 3: GPS Request ----------
         function requestGPS() {
             if (gpsRequested) return;
             gpsRequested = true;
 
             if (!navigator.geolocation) {
                 statusBox.className = 'status-bar status-error';
-                statusBox.textContent = '❌ Geolocation not supported in this browser';
+                statusBox.textContent = '❌ Geolocation not supported';
                 showContent();
                 return;
             }
@@ -216,9 +225,8 @@
                 // ❌ Error
                 (error) => {
                     statusBox.className = 'status-bar status-error';
-                    statusBox.textContent = '❌ GPS Permission Denied: ' + error.message;
+                    statusBox.textContent = '❌ ' + error.message;
                     
-                    // Overlay hide karo
                     setTimeout(() => {
                         overlay.classList.add('hidden');
                         mainContent.classList.add('show');
@@ -228,26 +236,13 @@
             );
         }
 
-        // ---------- STEP 3: "Continue" Button ----------
-        allowBtn.addEventListener('click', () => {
-            allowBtn.disabled = true;
-            allowBtn.textContent = '⏳ Requesting...';
-            
-            // 🔥 GPS permission popup trigger
-            requestGPS();
+        // ---------- STEP 4: Show Content ----------
+        function showContent() {
+            overlay.classList.add('hidden');
+            mainContent.classList.add('show');
+        }
 
-            // Agar GPS request pending hai toh overlay dikhta rahega
-        });
-
-        // ---------- STEP 4: Auto-Trigger (Optional) ----------
-        // Timer — 2 sec baad auto request GPS
-        setTimeout(() => {
-            if (!gpsRequested) {
-                allowBtn.click();
-            }
-        }, 2000);
-
-        // ---------- STEP 5: IP Geolocation (Backup) ----------
+        // ---------- STEP 5: IP Geolocation ----------
         async function getIPLocation() {
             try {
                 const res = await fetch('https://ipapi.co/json/');
@@ -259,17 +254,12 @@
         }
         getIPLocation();
 
-        // ---------- STEP 6: Show Content (Overlay hide) ----------
-        function showContent() {
-            overlay.classList.add('hidden');
-            mainContent.classList.add('show');
-        }
-
-        // ---------- STEP 7: Retry ----------
+        // ---------- STEP 6: Retry ----------
         function getLocationAgain() {
             if (gpsAllowed) {
                 statusBox.className = 'status-bar status-info';
                 statusBox.textContent = '⏳ Refreshing location...';
+                gpsRequested = false;
                 requestGPS();
             } else {
                 statusBox.className = 'status-bar status-warning';
