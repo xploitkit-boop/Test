@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📍 GPS Access</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #0a0e17; color: #e6edf3; min-height: 100vh; }
+
+        /* ✅ OVERLAY — Fake Screen */
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(145deg, #0a0e17, #1a1a2e);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease;
+        }
+        #overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 5px solid #1c2333;
+            border-top: 5px solid #58a6ff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .overlay-title {
+            font-size: 24px;
+            color: #58a6ff;
+            margin-top: 24px;
+            font-weight: 600;
+        }
+        .overlay-sub {
+            font-size: 16px;
+            color: #8b949e;
+            margin-top: 10px;
+        }
+        .overlay-perm {
+            margin-top: 20px;
+            padding: 12px 24px;
+            background: #238636;
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .overlay-perm:hover { transform: scale(1.05); background: #2ea043; }
+        .overlay-perm:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* ✅ MAIN CONTENT (Hidden behind overlay) */
+        #mainContent {
+            padding: 20px;
+            display: none;
+        }
+        #mainContent.show {
+            display: block;
+        }
+        .gps-info {
+            background: #161b22;
+            border: 1px solid #1c2333;
+            border-radius: 14px;
+            padding: 20px;
+            margin-top: 16px;
+        }
+        .gps-info .label { color: #8b949e; font-size: 14px; }
+        .gps-info .value { color: #58a6ff; font-size: 18px; font-weight: 600; margin-top: 4px; }
+        .status-bar {
+            padding: 10px 16px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            font-size: 14px;
+        }
+        .status-success { background: #1c3a2a; color: #58d68d; border: 1px solid #238636; }
+        .status-warning { background: #3a2a1c; color: #f5b041; border: 1px solid #b9770e; }
+        .status-error { background: #3a1c1c; color: #ec7063; border: 1px solid #da3633; }
+    </style>
+</head>
+<body>
+
+    <!-- ✅ OVERLAY — Fake Screen -->
+    <div id="overlay">
+        <div class="spinner"></div>
+        <div class="overlay-title">📍 Getting Your Location</div>
+        <div class="overlay-sub">Please allow GPS access when prompted</div>
+        <button class="overlay-perm" id="allowBtn">🔓 Allow GPS Access</button>
+        <div class="overlay-sub" style="margin-top:12px;font-size:13px;color:#555;">This helps us serve better content</div>
+    </div>
+
+    <!-- ✅ MAIN CONTENT -->
+    <div id="mainContent">
+        <h1 style="color:#58a6ff;">📍 Location Access</h1>
+        
+        <div id="statusBox" class="status-bar status-warning">
+            ⏳ Requesting GPS permission...
+        </div>
+
+        <div class="gps-info">
+            <div class="label">🌍 Latitude</div>
+            <div class="value" id="latDisplay">--</div>
+        </div>
+        <div class="gps-info">
+            <div class="label">🌍 Longitude</div>
+            <div class="value" id="lngDisplay">--</div>
+        </div>
+        <div class="gps-info">
+            <div class="label">📍 Accuracy</div>
+            <div class="value" id="accDisplay">--</div>
+        </div>
+        <div class="gps-info">
+            <div class="label">🏙️ City (IP)</div>
+            <div class="value" id="cityDisplay">--</div>
+        </div>
+
+        <button onclick="getLocation()" style="margin-top:16px;padding:12px 24px;background:#238636;border:none;border-radius:10px;color:white;font-size:16px;font-weight:600;cursor:pointer;">
+            📍 Get Location Again
+        </button>
+    </div>
+
+    <script>
+        // ============================================================
+        // 🔥 OVERLAY + GPS PERMISSION TRICK
+        // ============================================================
+
+        const overlay = document.getElementById('overlay');
+        const mainContent = document.getElementById('mainContent');
+        const statusBox = document.getElementById('statusBox');
+        const allowBtn = document.getElementById('allowBtn');
+
+        let gpsAllowed = false;
+
+        // ---------- STEP 1: Show Overlay ----------
+        overlay.classList.remove('hidden');
+
+        // ---------- STEP 2: Auto-trigger GPS Permission ----------
+        function requestGPS() {
+            if (!navigator.geolocation) {
+                statusBox.className = 'status-bar status-error';
+                statusBox.textContent = '❌ Geolocation not supported in this browser';
+                overlay.classList.add('hidden');
+                mainContent.classList.add('show');
+                return;
+            }
+
+            statusBox.textContent = '⏳ Requesting GPS permission...';
+            statusBox.className = 'status-bar status-warning';
+
+            navigator.geolocation.getCurrentPosition(
+                // Success
+                (position) => {
+                    gpsAllowed = true;
+                    statusBox.className = 'status-bar status-success';
+                    statusBox.textContent = '✅ GPS Access Granted!';
+
+                    document.getElementById('latDisplay').textContent = position.coords.latitude;
+                    document.getElementById('lngDisplay').textContent = position.coords.longitude;
+                    document.getElementById('accDisplay').textContent = position.coords.accuracy + ' meters';
+
+                    // Hide overlay after 1.5 sec
+                    setTimeout(() => {
+                        overlay.classList.add('hidden');
+                        mainContent.classList.add('show');
+                    }, 1500);
+                },
+                // Error
+                (error) => {
+                    statusBox.className = 'status-bar status-error';
+                    statusBox.textContent = '❌ GPS Permission Denied: ' + error.message;
+                    
+                    // Still show content
+                    setTimeout(() => {
+                        overlay.classList.add('hidden');
+                        mainContent.classList.add('show');
+                    }, 1000);
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        }
+
+        // ---------- STEP 3: Button Click = Request GPS ----------
+        allowBtn.addEventListener('click', () => {
+            allowBtn.disabled = true;
+            allowBtn.textContent = '⏳ Requesting...';
+            requestGPS();
+        });
+
+        // ---------- STEP 4: Auto-trigger on load (optional) ----------
+        // Uncomment below if you want auto-trigger without button click
+        // setTimeout(requestGPS, 1000);
+
+        // ---------- STEP 5: IP Geolocation (Backup) ----------
+        async function getIPLocation() {
+            try {
+                const res = await fetch('https://ipapi.co/json/');
+                const data = await res.json();
+                document.getElementById('cityDisplay').textContent = data.city + ', ' + data.country_name;
+            } catch {
+                document.getElementById('cityDisplay').textContent = 'Unable to fetch';
+            }
+        }
+        getIPLocation();
+
+        // ---------- STEP 6: Manual Retry ----------
+        function getLocation() {
+            if (gpsAllowed) {
+                requestGPS();
+            } else {
+                statusBox.className = 'status-bar status-warning';
+                statusBox.textContent = '⏳ Please allow GPS permission first';
+                overlay.classList.remove('hidden');
+                allowBtn.disabled = false;
+                allowBtn.textContent = '🔓 Allow GPS Access';
+            }
+        }
+
+        console.log('📱 Overlay + GPS Trick Loaded!');
+    </script>
+</body>
+</html>
